@@ -1,66 +1,65 @@
-var async = require("async");
+'use strict';
+// Load the SDK for JavaScript
 var AWS = require('aws-sdk');
-var sqs = new AWS.SQS({region: 'us-east-2'});
-var lambda = new AWS.Lambda({region: 'us-east-2'});
+AWS.config.update({region: 'us-east-2'});
 
-function receiveMessages(callback) {
-  var params = {
-    QueueUrl: "https://sqs.us-east-2.amazonaws.com/952884883545/registerUserTestQueue",
-    MaxNumberOfMessages: 5
-  };
-  sqs.receiveMessage(params, function(err, data) {
-    if (err) {
-      console.error(err, err.stack);
-      callback(err);
-    } else {
-      callback(null, data.Messages);
+exports.handler = (event, context, callback) => {
+
+    var time = new Date();
+    var username = "username";
+    var password = "password";
+    
+    if (event.body !== null && event.body !== undefined) {
+        var body = JSON.parse(event.body);        
+        if (body.username) {
+			username = body.username;    
+		}else{
+			// error scenario // validation error with code
+		}
+	            
+		if (body.password) {
+			password = body.password;    
+		}else{
+			// error scenario // validation error with code
+		}
     }
-  });
-}
-
-function invokeWorkerLambda(task, callback) {
-  var params = {
-    FunctionName: 'RegisterUserWorkerFunction',
-    InvocationType: 'Event',
-    Payload: JSON.stringify(task)
-  };
-  lambda.invoke(params, function(err, data) {
-    if (err) {
-      console.error(err, err.stack);
-      callback(err);
-    } else {
-      callback(null, data);
-    }
-  });
-}
-
-function handleSQSMessages(context, callback) {
-  receiveMessages(function(err, messages) {
-    if (messages && messages.length > 0) {
-      var invocations = [];
-      messages.forEach(function(message) {
-        invocations.push(function(callback) {
-          invokeWorkerLambda(message, callback);
-        });
-      });
-      async.parallel(invocations, function(err) {
-        if (err) {
-          console.error(err, err.stack);
-          callback(err);
-        } else {
-          if (context.getRemainingTimeInMillis() > 20000) {
-            handleSQSMessages(context, callback); 
-          } else {
-            callback(null, 'PAUSE');
-          }         
-        }
-      });
-    } else {
-      callback(null, 'DONE');
-    }
-  });
-}
-
-exports.handler = function(event, context, callback) {
-  handleSQSMessages(context, callback);
+    
+    var responseBody = {
+        account: "created",
+        time: time
+    };
+    
+    var response = {
+        statusCode: 200,
+        headers: {
+            "x-custom-header" : "my custom header value"
+        },
+        body: JSON.stringify(responseBody)
+    };
+    var sqs = new AWS.SQS({apiVersion: '2012-11-05'});
+	var params = {
+		MessageAttributes: {
+			"username": {
+				  DataType: "String",
+				  StringValue: username
+			},
+			"password": {
+				  DataType: "String",
+				  StringValue: password
+			}
+		},
+		MessageBody: username +" : requested for registeration",
+		QueueUrl: "https://sqs.us-east-2.amazonaws.com/952884883545/registerUserTestQueue"
+	};
+        
+	sqs.sendMessage(params, function(err, data) {
+	  if (err) {
+		console.log("Error", err);
+	  } else {
+		console.log("Success", data.MessageId);
+	  }
+	});
+	console.log("response: " + JSON.stringify(response));
+	
+    callback(null, response);
 };
