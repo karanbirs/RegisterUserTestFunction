@@ -1,6 +1,9 @@
 'use strict';
 // Load the SDK for JavaScript
 // added this line of comment to check if changes appear in the lambda code
+/*
+Added another comment to check if this comes while deploying the code
+*/
 var AWS = require('aws-sdk');
 AWS.config.update({region: 'us-east-2'});
 
